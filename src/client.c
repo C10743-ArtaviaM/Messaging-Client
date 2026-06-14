@@ -41,6 +41,27 @@ static void send_direct(int rank, const char* username, int dest,
          dest, text);
 }
 
+static void send_broadcast(int rank, const char* username, int* dests,
+                           int dest_count, const char* text) {
+  Message msg;
+  memset(&msg, 0, sizeof(Message));
+  msg.sender_rank = rank;
+  msg.dest_count = dest_count;
+
+  for (int i = 0; i < dest_count; i++) {
+    msg.dest_ranks[i] = dests[i];
+  }
+
+  strncpy(msg.body, text, MAX_BODY_LEN - 1);
+  msg.body_len = strlen(text);
+
+  char buffer[sizeof(Message)];
+  message_serialize(&msg, buffer);
+  MPI_Send(buffer, sizeof(Message), MPI_CHAR, 0, TAG_BROADCAST, MPI_COMM_WORLD);
+  printf("[Cliente %d '%s'] Broadcast a %d destinatarios: '%s'\n", rank,
+         username, dest_count, text);
+}
+
 static void receive_message(int rank) {
   char buffer[sizeof(Message)];
   Message msg;
@@ -56,9 +77,13 @@ static void receive_message(int rank) {
 void client_run(int rank, const char* username) {
   send_register(rank, username);
 
-  // Prueba - rank 1 le manda un mensaje a rank 2
   if (rank == 1) {
-    send_direct(rank, username, 2, "Hola Usuario!");
+    // Prueba - rank 1 le manda un mensaje a rank 2
+    // send_direct(rank, username, 2, "Hola Usuario!");
+
+    // rank 1 hace broadcast a rank 2 y 3
+    int dests[] = {2, 3};
+    send_broadcast(rank, username, dests, 2, "Hola a todos!");
   } else {
     receive_message(rank);
   }
