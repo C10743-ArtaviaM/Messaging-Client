@@ -8,6 +8,7 @@
 
 #include "../include/client.h"
 #include "../include/coordinator.h"
+#include "../include/gui.h"
 
 int main(int argc, char* argv[]) {
   int provided;
@@ -36,17 +37,21 @@ int main(int argc, char* argv[]) {
   // Parametros opcionales de prueba: --test <dest> <count>
   int dest = -1;
   int mesg_count = 1;
+  int use_gui = 0;
 
-  for (int i = size; i < argc - 2; i++) {
-    if (strcmp(argv[i], "--test") == 0) {
+  for (int i = size; i < argc; i++) {
+    if (strcmp(argv[i], "--test") == 0 && i + 2 < argc) {
       dest = atoi(argv[i + 1]);
       mesg_count = atoi(argv[i + 2]);
-      break;
+    } else if (strcmp(argv[i], "--gui") == 0) {
+      use_gui = 1;
     }
   }
 
   if (rank == 0) {
     coordinator_run(size);
+  } else if (use_gui) {
+    gui_run(rank, argv[rank], size);
   } else {
     client_run(rank, argv[rank], dest, mesg_count);
   }
