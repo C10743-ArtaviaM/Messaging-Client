@@ -5,6 +5,7 @@
 
 #include <mpi.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../include/protocol.h"
@@ -74,17 +75,35 @@ static void receive_message(int rank) {
          msg.sender_rank, msg.body);
 }
 
-void client_run(int rank, const char* username) {
+// Parsea "2,3" en dests[] = {2,3}, retorna cantidad de destinos
+static int parse_dest_list(char* str, int* dests, int max_dests) {
+  int count = 0;
+  char* token = strtok(str, ",");
+
+  while (token != NULL && count < max_dests) {
+    dests[count++] = atoi(token);
+    token = strtok(NULL, ",");
+  }
+  return count;
+}
+
+void client_run(int rank, const char* username, int dest, int msg_count) {
   send_register(rank, username);
 
-  if (rank == 1) {
-    // Prueba - rank 1 le manda un mensaje a rank 2
-    // send_direct(rank, username, 2, "Hola Usuario!");
+  if (dest > 0 && rank != dest) {
+    double total_time = 0;
 
-    // rank 1 hace broadcast a rank 2 y 3
-    int dests[] = {2, 3};
-    send_broadcast(rank, username, dests, 2, "Hola a todos!");
+    for (int i = 0; i < msg_count; i++) {
+      double start = MPI_Wtime();
+      send_direct(rank, username, dest, "Mensaje de prueba");
+      double end = MPI_Wtime();
+      total_time += (end - start);
+    }
+    printf("[Cliente %d] Latencia promedio (%d mensajes): %f segundos\n", rank,
+           msg_count, total_time / msg_count);
   } else {
-    receive_message(rank);
+    for (int i = 0; i < msg_count; i++) {
+      receive_message(rank);
+    }
   }
 }
