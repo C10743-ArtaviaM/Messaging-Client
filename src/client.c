@@ -1,14 +1,20 @@
 //
 // Mauricio Artavia Monge | June 13, 2026
 //
+#define _GNU_SOURCE
+
 #include "../include/client.h"
 
 #include <mpi.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "../include/protocol.h"
+
+static volatile int keep_listening = 1;
 
 static void send_register(int rank, const char* username) {
   Message msg;
@@ -63,16 +69,29 @@ static void send_broadcast(int rank, const char* username, int* dests,
          username, dest_count, text);
 }
 
-static void receive_message(int rank) {
+// Hilo receptor: sondea con MPI_Iprobe sin bloquear, y recibe si hay algo
+static void* receiver_thread(void* arg) {
+  int rank = *(int*)arg;
   char buffer[sizeof(Message)];
   Message msg;
   MPI_Status status;
+  int has_message;
 
-  MPI_Recv(buffer, sizeof(Message), MPI_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
-           &status);
-  message_deserialize(buffer, &msg);
-  printf("[Cliente %d] Mensaje recibido de rank %d: '%s'\n", rank,
-         msg.sender_rank, msg.body);
+  while (keep_listening) {
+    MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &has_message,
+               &status);
+
+    if (has_message) {
+      MPI_Recv(buffer, sizeof(Message), MPI_CHAR, status.MPI_SOURCE,
+               status.MPI_TAG, MPI_COMM_WORLD, &status);
+      message_deserialize(buffer, &msg);
+      printf("[Cliente %d] Mensaje recibido de rank %d: '%s'\n", rank,
+             msg.sender_rank, msg.body);
+    } else {
+      usleep(10000);  // 10ms, evita busy-waiting agresivo
+    }
+  }
+  return NULL;
 }
 
 // Parsea "2,3" en dests[] = {2,3}, retorna cantidad de destinos
@@ -90,6 +109,9 @@ static int parse_dest_list(char* str, int* dests, int max_dests) {
 void client_run(int rank, const char* username, int dest, int msg_count) {
   send_register(rank, username);
 
+  pthread_t tid;
+  pthread_create(&tid, NULL, receiver_thread, &rank);
+
   if (dest > 0 && rank != dest) {
     double total_time = 0;
 
@@ -101,9 +123,8 @@ void client_run(int rank, const char* username, int dest, int msg_count) {
     }
     printf("[Cliente %d] Latencia promedio (%d mensajes): %f segundos\n", rank,
            msg_count, total_time / msg_count);
-  } else {
-    for (int i = 0; i < msg_count; i++) {
-      receive_message(rank);
-    }
   }
+  sleep(1);  // Damos tiempo a que el receptor procese lo pendiente
+  keep_listening = 0;
+  pthread_join(tid, NULL);
 }
