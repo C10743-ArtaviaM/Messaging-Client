@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include "../include/client.h"
+#include "../include/coordinator.h"
 #include "../include/protocol.h"
 
 static GtkWidget* chat_view;
@@ -93,15 +94,53 @@ static void on_window_destroy(GtkWidget* widget, gpointer data) {
   gtk_main_quit();
 }
 
+static void receive_user_list(int rank, char user_list[][40], int* user_count,
+                              int* user_ranks) {
+  char buffer[sizeof(Message)];
+  Message msg;
+  MPI_Status status;
+
+  MPI_Recv(buffer, sizeof(Message), MPI_CHAR, 0, TAG_USER_LIST, MPI_COMM_WORLD,
+           &status);
+  message_deserialize(buffer, &msg);
+
+  *user_count = 0;
+  char* token = strtok(msg.body, ",");
+
+  while (token != NULL) {
+    int r;
+    char name[32];
+    sscanf(token, "%d:%31s", &r, name);
+
+    if (r != rank) {
+      user_ranks[*user_count] = r;
+      strncpy(user_list[*user_count], name, 39);
+      (*user_count)++;
+    }
+    token = strtok(NULL, ",");
+  }
+}
+
 void gui_run(int rank, const char* username, int total_processes) {
   my_rank = rank;
   strncpy(my_username, username, sizeof(my_username) - 1);
 
   // Simplificacion temporal: si soy rank 1, mando a rank 2 y viceversa
   // (remplaza por la lista de contactos proximamente)
-  dest_rank = (rank == 1 && total_processes > 2) ? 2 : 1;
+  // dest_rank = (rank == 1 && total_processes > 2) ? 2 : 1;
 
   send_register(rank, username);
+
+  // Recibo la lista de usuarios ANTES de arrancar el hilo receptor, evitamos
+  // que compitan por el mismo mensaje.
+  char user_list[MAX_CLIENTS][40];
+  int user_ranks[MAX_CLIENTS];
+  int user_count = 0;
+  receive_user_list(rank, user_list, &user_count, user_ranks);
+
+  if (user_count > 0) {
+    dest_rank = user_ranks[0];
+  }
 
   // Arranco el hilo recpetor ANTES de entrar al main loop de GTK
   pthread_t tid;

@@ -14,6 +14,7 @@
 #define TAG_DIRECT 1
 #define TAG_BROADCAST 2
 #define TAG_REGISTER 3
+#define TAG_USER_LIST 4
 
 typedef struct {
   int sender_rank;

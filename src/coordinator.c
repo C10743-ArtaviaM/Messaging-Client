@@ -42,6 +42,34 @@ static void route_broadcast(Message* msg) {
          msg->sender_rank, msg->dest_count);
 }
 
+static void broadcast_user_list(int clients_expected) {
+  char list_str[MAX_BODY_LEN];
+  list_str[0] = '\0';
+
+  for (int i = 0; i < client_count; i++) {
+    char entry[64];
+    snprintf(entry, sizeof(entry), "%d:%s,", clients[i].rank,
+             clients[i].username);
+    strncat(list_str, entry, sizeof(list_str) - strlen(list_str) - 1);
+  }
+
+  Message msg;
+  memset(&msg, 0, sizeof(Message));
+  msg.sender_rank = 0;
+  strncpy(msg.body, list_str, MAX_BODY_LEN - 1);
+  msg.body_len = strlen(list_str);
+
+  char buffer[sizeof(Message)];
+  message_serialize(&msg, buffer);
+
+  for (int i = 0; i < clients_expected; i++) {
+    MPI_Send(buffer, sizeof(Message), MPI_CHAR, clients[i].rank, TAG_USER_LIST,
+             MPI_COMM_WORLD);
+  }
+
+  printf("[Coordinador] Lista de usuarios enviada: %s\n", list_str);
+}
+
 void coordinator_run(int total_processes) {
   int clients_expected = total_processes - 1;
   char buffer[sizeof(Message)];
@@ -58,6 +86,7 @@ void coordinator_run(int total_processes) {
 
   printf(
       "[Coordinador] Todos los clientes registrados. Enrutando mensajes ...\n");
+  broadcast_user_list(clients_expected);
 
   // Fase 2 - Loop de enrutamiento
   while (1) {
