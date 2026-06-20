@@ -18,9 +18,12 @@
 
 static GtkWidget* chat_view;
 static GtkWidget* entry;
+static GtkWidget* mode_combo;
+static GtkWidget* contact_checks[MAX_CLIENTS];
+static int contact_ranks[MAX_CLIENTS];
+static int contact_count = 0;
 static int my_rank;
 static char my_username[32];
-static int dest_rank = -1;  // temp fijo, se setea en gui_run
 static volatile int keep_listening = 1;
 
 static void append_to_chat(const char* text) {
@@ -59,7 +62,6 @@ static void* receiver_thread(void* arg) {
       char* display = malloc(MAX_BODY_LEN + 64);
       snprintf(display, MAX_BODY_LEN + 64, "Rank %d: %s", msg.sender_rank,
                msg.body);
-
       // Encolo actualizacion que GTK ejecuta en su hilo.
       g_idle_add(update_chat_from_main_thread, display);
     } else {
@@ -69,16 +71,74 @@ static void* receiver_thread(void* arg) {
   return NULL;
 }
 
+static void on_contact_toggled(GtkToggleButton* toggle, gpointer data) {
+  int index = GPOINTER_TO_INT(data);
+  int is_broadcast = gtk_combo_box_get_active(GTK_COMBO_BOX(mode_combo)) == 1;
+
+  if (!is_broadcast && gtk_toggle_button_get_active(toggle)) {
+    // Modo Directo: desmarcamos todos los demas
+    for (int i = 0; i < contact_count; i++) {
+      if (i != index) {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(contact_checks[i]),
+                                     FALSE);
+      }
+    }
+  }
+}
+
+static void on_mode_changed(GtkComboBox* combo, gpointer data) {
+  (void)data;
+  int is_broadcast = gtk_combo_box_get_active(combo) == 1;
+
+  if (!is_broadcast) {
+    // Al cambiar a direct, dejamos solo el primero marcado activo
+    int found_first = 0;
+
+    for (int i = 0; i < contact_count; i++) {
+      gboolean active =
+          gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(contact_checks[i]));
+
+      if (active && !found_first) {
+        found_first = 1;
+      } else if (active) {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(contact_checks[i]),
+                                     FALSE);
+      }
+    }
+  }
+}
+
 static void on_send_clicked(GtkWidget* widget, gpointer data) {
   (void)widget;
   (void)data;
   const char* text = gtk_entry_get_text(GTK_ENTRY(entry));
 
-  if (strlen(text) == 0 || dest_rank < 0) {
+  if (strlen(text) == 0) {
     return;
   }
 
-  send_direct(my_rank, my_username, dest_rank, text);
+  // Recopilamos los contactos que han sido marcados
+  int selected[MAX_CLIENTS];
+  int selected_count = 0;
+
+  for (int i = 0; i < contact_count; i++) {
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(contact_checks[i]))) {
+      selected[selected_count++] = contact_ranks[i];
+    }
+  }
+
+  if (selected_count == 0) {
+    append_to_chat("(Selecciona al menos un contacto)");
+    return;
+  }
+
+  int is_broadcast = gtk_combo_box_get_active(GTK_COMBO_BOX(mode_combo)) == 1;
+
+  if (is_broadcast) {
+    send_broadcast(my_rank, my_username, selected, selected_count, text);
+  } else {
+    send_direct(my_rank, my_username, selected[0], text);
+  }
 
   char display[300];
   snprintf(display, sizeof(display), "Yo: %s", text);
@@ -122,6 +182,7 @@ static void receive_user_list(int rank, char user_list[][40], int* user_count,
 }
 
 void gui_run(int rank, const char* username, int total_processes) {
+  (void)total_processes;
   my_rank = rank;
   strncpy(my_username, username, sizeof(my_username) - 1);
 
@@ -138,10 +199,6 @@ void gui_run(int rank, const char* username, int total_processes) {
   int user_count = 0;
   receive_user_list(rank, user_list, &user_count, user_ranks);
 
-  if (user_count > 0) {
-    dest_rank = user_ranks[0];
-  }
-
   // Arranco el hilo recpetor ANTES de entrar al main loop de GTK
   pthread_t tid;
   pthread_create(&tid, NULL, receiver_thread, NULL);
@@ -152,11 +209,36 @@ void gui_run(int rank, const char* username, int total_processes) {
   char title[64];
   snprintf(title, sizeof(title), "Mensajeria - %s (rank %d)", username, rank);
   gtk_window_set_title(GTK_WINDOW(window), title);
-  gtk_window_set_default_size(GTK_WINDOW(window), 500, 400);
+  gtk_window_set_default_size(GTK_WINDOW(window), 650, 420);
   g_signal_connect(window, "destroy", G_CALLBACK(on_window_destroy), NULL);
 
+  GtkWidget* hbox_main = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+  gtk_container_add(GTK_CONTAINER(window), hbox_main);
+
+  GtkWidget* contacts_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+  gtk_widget_set_size_request(contacts_box, 160, -1);
+  GtkWidget* contacts_label = gtk_label_new("Contactos");
+  gtk_box_pack_start(GTK_BOX(contacts_box), contacts_label, FALSE, FALSE, 4);
+
+  contact_count = user_count;
+  for (int i = 0; i < user_count; i++) {
+    contact_ranks[i] = user_ranks[i];
+    char label[80];
+    snprintf(label, sizeof(label), "%s (rank %d)", user_list[i], user_ranks[i]);
+    contact_checks[i] = gtk_check_button_new_with_label(label);
+    g_signal_connect(contact_checks[i], "toggled",
+                     G_CALLBACK(on_contact_toggled), GINT_TO_POINTER(i));
+    gtk_box_pack_start(GTK_BOX(contacts_box), contact_checks[i], FALSE, FALSE,
+                       0);
+  }
+  if (user_count > 0) {
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(contact_checks[0]), TRUE);
+  }
+
+  gtk_box_pack_start(GTK_BOX(hbox_main), contacts_box, FALSE, FALSE, 4);
+
   GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
-  gtk_container_add(GTK_CONTAINER(window), vbox);
+  gtk_box_pack_start(GTK_BOX(hbox_main), vbox, TRUE, TRUE, 0);
 
   chat_view = gtk_text_view_new();
   gtk_text_view_set_editable(GTK_TEXT_VIEW(chat_view), FALSE);
@@ -167,6 +249,14 @@ void gui_run(int rank, const char* username, int total_processes) {
   gtk_box_pack_start(GTK_BOX(vbox), scroll, TRUE, TRUE, 0);
 
   GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+
+  mode_combo = gtk_combo_box_text_new();
+  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(mode_combo), "Directo");
+  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(mode_combo), "Difusion");
+  gtk_combo_box_set_active(GTK_COMBO_BOX(mode_combo), 0);
+  g_signal_connect(mode_combo, "changed", G_CALLBACK(on_mode_changed), NULL);
+  gtk_box_pack_start(GTK_BOX(hbox), mode_combo, FALSE, FALSE, 0);
+
   entry = gtk_entry_new();
   gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 0);
 
