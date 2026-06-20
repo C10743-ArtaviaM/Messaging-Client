@@ -16,7 +16,7 @@
 
 static volatile int keep_listening = 1;
 
-static void send_register(int rank, const char* username) {
+void send_register(int rank, const char* username) {
   Message msg;
   memset(&msg, 0, sizeof(Message));
   msg.sender_rank = rank;
@@ -31,8 +31,7 @@ static void send_register(int rank, const char* username) {
   printf("[Cliente %d] Registrado como '%s'\n", rank, username);
 }
 
-static void send_direct(int rank, const char* username, int dest,
-                        const char* text) {
+void send_direct(int rank, const char* username, int dest, const char* text) {
   Message msg;
   memset(&msg, 0, sizeof(Message));
   msg.sender_rank = rank;
@@ -48,8 +47,8 @@ static void send_direct(int rank, const char* username, int dest,
          dest, text);
 }
 
-static void send_broadcast(int rank, const char* username, int* dests,
-                           int dest_count, const char* text) {
+void send_broadcast(int rank, const char* username, int* dests, int dest_count,
+                    const char* text) {
   Message msg;
   memset(&msg, 0, sizeof(Message));
   msg.sender_rank = rank;
