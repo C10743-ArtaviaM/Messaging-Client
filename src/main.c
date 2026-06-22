@@ -30,6 +30,7 @@ int main(int argc, char* argv[]) {
   int dest = -1;
   int mesg_count = 1;
   int use_gui = 0;
+  int use_cli = 0;
 
   for (int i = size; i < argc; i++) {
     if (strcmp(argv[i], "--test") == 0 && i + 2 < argc) {
@@ -37,6 +38,8 @@ int main(int argc, char* argv[]) {
       mesg_count = atoi(argv[i + 2]);
     } else if (strcmp(argv[i], "--gui") == 0) {
       use_gui = 1;
+    } else if (strcmp(argv[i], "--cli") == 0) {
+      use_cli = 1;
     }
   }
 
@@ -44,6 +47,8 @@ int main(int argc, char* argv[]) {
     coordinator_run(size);
   } else if (use_gui) {
     gui_run(rank, argv[rank], size);
+  } else if (use_cli) {
+    cli_run(rank, argv[rank], size);
   } else {
     client_run(rank, argv[rank], dest, mesg_count);
   }
