@@ -304,6 +304,11 @@ Messaging-Client/
 │   ├── mensajeria
 │   └── test_protocol
 │
+├── docs/
+|   ├── messaging_client.pdf
+│   └── messaging_client.pptx
+|
+│
 ├── include/
 │   ├── client.h
 │   ├── coordinator.h
