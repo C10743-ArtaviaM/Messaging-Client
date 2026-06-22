@@ -31,7 +31,7 @@ dirs:
 # MAIN BUILD
 # -------------------------
 $(TARGET): $(SRCS)
-	$(CC) $(CFLAGS) -I$(INC_DIR) $(SRCS) -o $(TARGET) $(GTKLIBS)
+	$(CC) $(CFLAGS) $(GTKFLAGS) -I$(INC_DIR) $(SRCS) -o $(TARGET) $(GTKLIBS)
 
 # -------------------------
 # TESTS (sin GTK)
@@ -49,7 +49,7 @@ test: $(TEST_BIN)
 # SANITIZE
 # -------------------------
 sanitize:
-	$(CC) $(CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer \
+	$(CC) $(CFLAGS) $(GTKFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer \
 	-I$(INC_DIR) $(SRCS) -o $(TARGET) $(GTKLIBS)
 
 # -------------------------

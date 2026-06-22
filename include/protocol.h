@@ -10,18 +10,19 @@
 #define MAX_DEST 64
 
 // Tags MPI para lograr identificar el tipo de mensaje
+#define TAG_DIRECT 1     // Mensaje punto a punto.
+#define TAG_BROADCAST 2  // Mensaje a multiples puntos.
+#define TAG_REGISTER 3   // Registro inicial del cliente en el coordinador.
+#define TAG_USER_LIST 4  // Envio de lista de usuarios conectados.
 
-#define TAG_DIRECT 1
-#define TAG_BROADCAST 2
-#define TAG_REGISTER 3
-#define TAG_USER_LIST 4
-
+/* Struct de mensaje del sistema */
+/** @breif Estructura base de comunicacion del sistema MPI */
 typedef struct {
-  int sender_rank;
-  int dest_ranks[MAX_DEST];
-  int dest_count;
-  size_t body_len;
-  char body[MAX_BODY_LEN];
+  int sender_rank;           // Rank del proceso emisor.
+  int dest_ranks[MAX_DEST];  // Lista de destinatarios.
+  int dest_count;            // Cantidad de destinatarios.
+  size_t body_len;           // Longitud real del mensaje.
+  char body[MAX_BODY_LEN];   // Contenido del mensaje.
 } Message;
 
 // Serializacion

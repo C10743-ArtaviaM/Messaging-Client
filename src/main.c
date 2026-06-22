@@ -6,11 +6,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../include/cli.h"
 #include "../include/client.h"
 #include "../include/coordinator.h"
 #include "../include/gui.h"
 #include "../include/mpi_wrapper.h"
 
+/**
+ * @brief Punto de entrada principal del sistema de mensajeria MPI.
+ *
+ * @param argc Cantidad de argumentos de linea de comandos.
+ * @param argv Vector de argumentos de linea de comandos.
+ * @return EXIT_SUCCESS si la ejecucion finaliza correctamente,
+ *         EXIT_FAILURE si faltan argumentos o configuracion invalida.
+ */
 int main(int argc, char* argv[]) {
   mpi_init(&argc, &argv);
 

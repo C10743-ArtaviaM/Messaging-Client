@@ -1,3 +1,6 @@
+//
+// Mauricio Artavia Monge | June 22, 2026
+//
 #include "../include/cli.h"
 
 #include <stdio.h>
@@ -55,7 +58,7 @@ void cli_run(int rank, const char* username, int total_processes) {
       char list[256];
       char msg[400];
 
-      int parsed = sscanf(line + 10, "%s $[^\n]", list, msg);
+      int parsed = sscanf(line + 10, "%255s $399[^\n]", list, msg);
 
       if (parsed < 2) {
         printf("Uso: broadcast <1,2,3> <mensaje>\n");

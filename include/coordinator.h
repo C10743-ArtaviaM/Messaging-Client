@@ -8,11 +8,20 @@
 
 #include "../include/mpi_wrapper.h"
 
+/**
+ * @struct ClientInfo
+ * @brief Informacion basica de un cliente registrado en el sistema.
+ */
 typedef struct {
-  int rank;
-  char username[32];
+  int rank;          /** Rank del proceso MPI */
+  char username[32]; /** Nombre del usuario  */
 } ClientInfo;
 
+/**
+ * @brief Ejecuta la logica principal del coordinador (rank 0).
+ *
+ * @param total_processes Numero total de procesos MPI en ejecucion.
+ */
 void coordinator_run(int total_processes);
 
 #endif  // COORDINATOR_H
