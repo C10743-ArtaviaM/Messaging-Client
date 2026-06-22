@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (rank = 0) {
+  if (rank == 0) {
     coordinator_run(size);
   } else if (use_gui) {
     gui_run(rank, argv[rank], size);

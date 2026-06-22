@@ -4,7 +4,7 @@
 #ifndef GUI_H
 #define GUI_H
 
-#include "../include/mpi_wrapper.h"
+#include "../include/coordinator.h"
 
 void gui_run(int rank, const char* username, int total_processes);
 

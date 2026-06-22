@@ -61,111 +61,227 @@
   </table>
 </div>
 
-## 1. Descripción general
+---
 
-El propósito de esta tarea programada es que la persona estudiante aprenda a diseñar la arquitectura y el desarrollo de una aplicación de mensajería — similar a WhatsApp o Telegram — capaz de enviar mensajes a un destinatario específico o a una lista de difusión de destinatarios.
+**Mauricio Artavia Monge | C10743**
 
-La aplicación se implementará en lenguaje `C` utilizando la biblioteca de paso de mensajes `OpenMPI`.
+# Descripcion de la Tarea Programada
 
-Para mantener la tarea en un nivel introductorio, la aplicación solo debe admitir mensajes en formato de texto plano. No debe enviar imágenes, audio ni stickers.
+La presente tarea programada nos lleva a implementar un sistema de mensajeria distribuida similar a lo que son aplicaciones como WhatsApp o Telegram, haciendo uso de **`C`** y **`OpenMPI`**.
 
-## 2. Especificación de la tarea
+Mi sistema permite:
 
-### 2.1 Requisitos funcionales
+- Enviar mensajes directos entre varios procesos.
+- Envar mensajes por difusion, conocido tambien como `broadcast`.
+- Ejecutar multiples instancias las cuales son concurrentes.
+- Visualizar mensajes mediante `CLI` o interfaz grafica `(GUI)` por medio de **GTK**.
+  
+El sistema lo base en una arquitectura de cliente-coordinador, donde nuestro proceso `rank 0` va a actuar como un intermediario central durante la mensajeria.
 
-- Enviar mensajes de texto a un destinatario específico.
+---
 
-- Enviar mensajes de texto a una lista de difusión (broadcast) de destinatarios.
+# Arquitectura del Sistema
 
-- Admitir únicamente texto plano: la aplicación no debe enviar imágenes, audio ni stickers.
+## Componentes Principales
 
-- Permitir varias instancias de la aplicación en ejecución simultánea, cada una enviando y recibiendo mensajes.
+### Coordinador (`rank 0`)
 
-- Incluir un proceso coordinador, correspondiente al `rank 0`, encargado de administrar y enrutar la mensajería.
+- Registro de clientes al inicio.
+- Mantenimiento de la tabla `rank <-> usuario`
+- Enrutamiento de mensajes:
+- - Directos
+- - Difusion o broadcast
+- Distribucion de lista de usuarios a cada cliente
 
-- Ofrecer una interfaz gráfica de usuario (**GUI**) y una versión de linea de comandos (**CLI**).
+### Clientes (`rank  1..N`)
+- Envio de mensajes al coordinador
+- Reciben mensajes del coordinador
+- Ejecucion de interfaz (`CLI` o `GUI`)
+- Uso de hilos para comunicacion concurrente
+
+---
+
+## Concurrencia
+
+Con cada cliente tenemos una separacion de:
+
+- Un hilo de interfaz (`CLI` o `GUI`)
+- Un hilo receptor MPI (`pthread`)
+
+Con esto se logra evitar la aparicion de bloqueos durante la interfaz grafica.
+
+Utilizando:
+
+- `MPI_Init_thread(MPI_THREAD_MULTIPLE)`
+- `pthread_create`
+- `MPI_Iprobe` para recepciones no bloqueantes
+
+--- 
+
+# Protocolo de mensajes
+
+Uso de un struct tal como: 
+
+```c
+typedef struct {
+  int sender_rank;
+  int dest_ranks[MAX_DEST];
+  int dest_count;
+  size_t body_len;
+  char body[MAX_BODY_LEN];
+} Message;
+```
+
+## Campos a usar
+
+- `sender_rank`: el proceso origen
+- `dest_ranks[]`: la lista de destinos
+- `dest_count`: la cantidad de destinos
+- `body_len`: la longitud del mensaje
+- `body`: el contenido del mensaje
+
+---
+
+## Tags MPI
+
+| **TAG** | **SIGNIFICADO**   |
+| ------- | ----------------- |
+| **1**   | Mensaje Directo   |
+| **2**   | Broadcast         |
+| **3**   | Registro          |
+| **4**   | Lista de Usuarios |
+
+## Serializacion
+
+El protocolo es serializado cuando se usa una copia directa de memoria:
+
+```c
+memcpy(buffer, msg, sizeof(Message));
+```
+
+---
+
+# MPI Wrapper
+
+## Proposito
+
+- Encapsulamiento llamadas MPI
+- Simplificacion del codigo
+- Centralizado de logica de comunicacion
+- Facilidad de mantenimiento.
+
+---
+
+# Interfaces
+
+## `GUI` (**GTK**)
+
+Podemos observar en la interfaz grafica lo siguiente:
+
+- Lista de contactos
+- Seleccion de modo:
+- - Directo
+- - Difusion
+- Area de chat en tiempo real
+- Hilo separado que permite la recepcion de mensajes
+
+## `CLI`
+
+- Permite el uso para pruebas de latencia
+- Usa `MPI_Wtime`
+- Permite la ejecucion sin interfaz grafica
+
+---
+
+# Pruebas y Calidad
+
+## Unit tests
+
+- Serializacion / Deserializacion de mensajes
+- Integridad del protocolo
+- Casos limite del cuerpo del mensaje
+
+***Ejecucion:***
+
+```bash
+make test
+```
+
+---
+
+## Sanitizers
+
+Valida ausencia de:
+
+- Memory leaks
+- Undefined behavior
+- Data races
+
+***Ejecucion:***
+
+```bash
+make sanitize
+```
+
+## Valgrind
+
+Se ha validado el sistema sin fugas de memoria en sus propios componentes.
+
+---
+
+# Compilacion
+
+```bash
+make
+```
+
+---
+
+# Ejecucion
+
+## MPI con GUI
+
+```bash
+mpirun -np N ./bin/mensajeria user1 user2 user3 ... userN --gui
+```
+
+## CLI / Pruebas
+
+```bash
+mpirun -np N ./bin/mensajeria user1 user2 user3 ... userN --test 2 10
+```
+
+---
+
+# Estrucura del Proyecto
 
 
-### 2.2 Arquitectura sugerida del cliente
 
-Se sugiere que cada instancia del cliente sea un proceso **MPI**, lanzado con `mpirun -np N ./cliente`, donde $N$ es el número de clientes simultáneos. La arquitectura recomendada es la siguiente:
+---
 
-- **Coordinador (rank 0):** registra a los clientes conectados, mantiene la tabla que asocia cada rank con un nombre de usuario, administra las listas de difusión y enruta cada mensaje hacia su destino. También puede registrar bitácoras y métricas globales.
+# Decisiones del diseno
 
-- **Clientes (ranks $1$ a $N−1$):** envían sus mensajes al coordinador indicando el tipo (directo o difusión) mediante etiquetas (`tags`) de `MPI`, y reciben los mensajes dirigidos a ellos.
+- MPI es usado como sistema de comunicacion distribuida
+- Uso del coordinador central para simplificacion del routing
+- Se decidio el uso de pthreads para la concurrencia de los clientes
+- GTK como principal interfaz grafica beta
+- Serializacion manual para obtener control total del protocolo
+- Se implemento el Wrapper MPI para poder desacoplar logica de comunicacion
+---
 
-- **Concurrencia interna:** cada cliente debe separar el hilo de la interfaz del hilo de comunicación (por ejemplo, con `pthreads` y `MPI_Init_thread`), de manera que la **GUI** no se congele mientras se espera un mensaje.
+# Referencias
 
-- **Protocolo de mensajes:** defina una estructura con remitente, destinatario o lista de destino, longitud y cuerpo del mensaje, serializada como un búfer de caracteres. Documente este protocolo en el `README` y en los diagramas.
+- OpenMPI Documentation: [https://docs.open-mpi.org/](https://docs.open-mpi.org/)
+- Message Passing Interface Forum: [https://www.mpi-forum.org/docs/](https://www.mpi-forum.org/docs/)
+- GTK Project: [https://docs.gtk.org/gtk3/](https://docs.gtk.org/gtk3/)
+- GNU Project: [https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html](https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html)
+- Valgrind Developers: [https://valgrind.org/docs/manual/manual.html](https://valgrind.org/docs/manual/manual.html)
+- Material de Clase, Prof. Sleyter Angulo.
 
-### 2.3 Interfaces de usuario
-
-La tarea debe implementar una interfaz gráfica de usuario construida con alguna biblioteca de `C` para **GUI**, tal como `GTK`, `Qt` o `FLTK`. *Cualquier otra biblioteca debe ser aprobada previamente por el profesor*. La interfaz debe desarrollarse completamente por código: no se permite el uso de diseñadores de tipo arrastrar y soltar (*drag and drop*).
-
-Además, debe implementarse una versión de línea de comandos (**CLI**) con el mismo núcleo de comunicación. Esta versión facilita la generación de casos de prueba y la obtención de métricas, por ejemplo, la latencia y el rendimiento medidos con `MPI_Wtime`.
-
-## 3. Entregables
-
-- Todos los archivos fuente de la aplicación.
-
-- README con instrucciones de compilación, ejecución y uso, y con la documentación del protocolo de mensajes.
-
-- Repositorio Git con un historial de commits consistente con el desarrollo del proyecto.
-
-- Diagramas con el diseño de la arquitectura y el análisis que justifica las decisiones tomadas. La persona estudiante debe comprender este diseño en su totalidad y estar en capacidad de presentarlo y demostrarlo.
-
-- Presentación para la defensa de la tarea.
+---
 
 
-## 4. Sugerencia de tecnología
-
-- **Lenguaje:** `C` (estándar C11 o superior).
-
-- **Paso de mensajes:** `OpenMPI`.
-
-- **Interfaz gráfica:** `GTK`, `Qt` (por código, sin diseñadores de arrastrar y soltar) o `FLTK`; *otras bibliotecas requieren aprobación previa del profesor*.
-
-- **Hilos:** pthreads para separar la interfaz de la comunicación.
-
-- **Construcción:** `Make`.
-
-- **Control de versiones:** `Git`.
-
-- **Calidad:** `Valgrind` y los sanitizers de `GCC`/`Clang` para detectar errores de memoria y condiciones de carrera; `Check`, `CUnit` o `Unity` para las pruebas unitarias.
-
-## 5. Funciones MPI de la biblioteca OpenMPI
-
-La siguiente tabla resume las funciones de MPI recomendadas para esta tarea:
-
-| Función                            | Propósito en esta tarea |
-| :--------------------------------- | :---- |
-| **`MPI_Init` / `MPI_Init_thread`** | Inicializan el entorno **MPI**. La variante `MPI_Init_thread` permite solicitar soporte de hilos (por ejemplo, `MPI_THREAD_FUNNELED`), necesario cuando la interfaz gráfica y la comunicación se ejecutan en hilos distintos. |
-| **`MPI_Comm_rank`**                | Obtiene el identificador (`rank`) del proceso dentro del comunicador. El proceso con `rank 0` actúa como coordinador. |
-| **`MPI_Comm_size`**                | Obtiene el número total de procesos (**clientes**) en ejecución. |
-| **`MPI_Send` / `MPI_Recv`**        | Envío y recepción bloqueantes punto a punto. Base del intercambio de mensajes entre clientes y coordinador. |
-| **`MPI_Isend` / `MPI_Irecv`**      | Versiones no bloqueantes del envío y la recepción. Útiles para que la interfaz no se congele mientras se espera un mensaje. |
-| **`MPI_Probe` / `MPI_Iprobe`**     | Consultan si existe un mensaje pendiente (y sus metadatos) sin recibirlo. `MPI_Iprobe` permite sondear sin bloquear el hilo. |
-| **`MPI_Get_count`**                | Determina la cantidad de elementos del mensaje recibido; permite reservar el búfer del tamaño correcto. |
-| **`MPI_Bcast`**                    | Operación colectiva de difusión desde un proceso raíz hacia todos los demás; útil para anuncios globales del coordinador. |
-| **`MPI_Barrier`**                  | Sincroniza todos los procesos; útil en el arranque ordenado de la aplicación y en las pruebas. |
-| **`MPI_Wtime`**                    | Devuelve el tiempo transcurrido en segundos; sirve para medir métricas de latencia y rendimiento desde la versión **CLI**. |
-| **`MPI_Finalize`**                 | Cierra ordenadamente el entorno **MPI** al terminar la aplicación. |
-| **`MPI_Abort`**                    | Termina todos los procesos ante un error irrecuperable. |
-
-## 6. Consideraciones
-
-- La tarea debe desarrollarse en grupos de una persona (de manera individual).
-
-- No se aceptarán entregas tardías. Si la plataforma de entrega está fuera de servicio (Mediación Virtual), la persona estudiante debe enviar su trabajo desde el correo institucional al profesor, con copia obligatoria a la persona asistente, antes de la hora límite.
-
-- La presentación inicia a las 07:00 a. m. La persona estudiante que llegue más de 15 minutos tarde **NO PODRA PRESENTAR** y se registrará como ausente, conforme a lo dispuesto en el programa del curso y en los artículos 14 bis y 24 del Reglamento de Régimen Académico Estudiantil de la Universidad de Costa Rica. Para optar por la reposición, deberá presentar la solicitud con toda la documentación probatoria requerida, a más tardar cinco días hábiles después de reintegrarse a sus estudios (artículo 24).
-
-- Queda prohibido el uso de inteligencia artificial de cualquier tipo. En caso de utilizarla, la calificación final de esta tarea será de **cero** y se iniciará el proceso administrativo correspondiente.
-
-- El plagio también está prohibido y se sancionará conforme a la normativa de la Universidad de Costa Rica.
-
-
-## 7. Evaluación
+## Evaluación
 
 | Rubro | Descripción | Puntos |
 | :---: | :---- | :---: |
@@ -176,16 +292,7 @@ La siguiente tabla resume las funciones de MPI recomendadas para esta tarea:
 | **Presentación** | Dominio de la arquitectura, demostración en vivo y respuestas a preguntas. | $50$ |
 |  | **TOTAL** | **$100$** |  |
 
-## 8. Referencias
-
-Consejo Universitario, Universidad de Costa Rica. Reglamento de Régimen Académico
-Estudiantil (aprobado en sesión 4632-03 del 9 de mayo de 2001; artículo 14 bis reformado, más
-recientemente, en sesión 6968-15 del 12 de febrero de 2026). Disponible en:
-https://www.cu.ucr.ac.cr/normativa/regimen_academico_estudiantil.pdf
-
-The Open MPI Project. Open MPI Documentation. Disponible en: https://docs.open-mpi.org/
-
-## 9. Rúbrica de evaluación y retroalimentación
+## Rúbrica de evaluación y retroalimentación
 
 La siguiente tabla se utilizará durante la revisión y la presentación de la tarea. La columna de
 comentarios está reservada para las observaciones del profesor.

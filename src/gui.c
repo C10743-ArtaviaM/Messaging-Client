@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include "../include/client.h"
+#include "../include/mpi_wrapper.h"
 #include "../include/protocol.h"
 
 static GtkWidget* chat_view;
