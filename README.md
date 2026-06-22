@@ -116,6 +116,12 @@ Utilizando:
 - `pthread_create`
 - `MPI_Iprobe` para recepciones no bloqueantes
 
+## Diseno de concurrencia
+
+El sistema nos evita bloqueo un de la interfaz utilizando:
+- Thread separado para recepción MPI
+- Cola de mensajes interna
+
 --- 
 
 # Protocolo de mensajes
@@ -225,7 +231,25 @@ make sanitize
 
 ## Valgrind
 
-Se ha validado el sistema sin fugas de memoria en sus propios componentes.
+Este trabajo nos incluye un target automatizado para analisis de memoria con Valgrind.
+
+Los logs que se generan seran almacenados en:
+
+```bash
+logs/valgrind-*.log
+```
+
+***Ejecucion:***
+
+```bash
+make valgrind
+```
+
+Esto nos ha de permitir:
+
+- Deteccion de memory leaks
+- Deteccion de accesos invalidos
+- Validacion de integridad en la ejecucion concurrente de `MPI`
 
 ---
 
@@ -234,6 +258,19 @@ Se ha validado el sistema sin fugas de memoria en sus propios componentes.
 ```bash
 make
 ```
+
+---
+
+# Limpieza
+
+```bash
+make clean
+```
+
+Elimina:
+
+- `bin/`
+- `logs/`
 
 ---
 
@@ -255,6 +292,55 @@ mpirun -np N ./bin/mensajeria user1 user2 user3 ... userN --test 2 10
 
 # Estrucura del Proyecto
 
+```
+Messaging-Client/
+├── assets/
+│   └── diagrams/
+│       ├── architecture_diagram.png
+│       ├── concurrency_diagram.png
+│       └── message_flow.png
+│
+├── bin/
+│   ├── mensajeria
+│   └── test_protocol
+│
+├── include/
+│   ├── client.h
+│   ├── coordinator.h
+│   ├── gui.h
+│   ├── mpi_wrapper.h
+│   └── protocol.h
+│
+├── logs/
+│   └── valgrind-*.log
+│
+├── src/
+│   ├── main.c
+│   ├── coordinator.c
+│   ├── client.c
+│   ├── gui.c
+│   ├── cli.c
+│   ├── mpi_wrapper.c
+│   └── protocol.c
+│
+├── tests/
+│   └── test_protocol.c
+│
+├── assignment.md
+├── README.md
+└── Makefile
+```
+
+### Descripción
+
+* `src/`: implementación principal del sistema.
+* `include/`: encabezados públicos del proyecto.
+* `tests/`: pruebas unitarias.
+* `bin/`: ejecutables generados por el proceso de compilación.
+* `assets/diagrams/`: diagramas de arquitectura, concurrencia y flujo de mensajes.
+* `README.md`: documentación técnica y guía de uso.
+* `assignment.md`: especificación original de la tarea.
+* `Makefile`: automatización de compilación y pruebas.
 
 
 ---
