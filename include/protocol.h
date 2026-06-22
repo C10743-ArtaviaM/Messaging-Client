@@ -26,8 +26,27 @@ typedef struct {
 } Message;
 
 // Serializacion
+/**
+ * @brief Serializa un mensaje en un buffer binario.
+ *
+ * @param msg Puntero al mensaje a serializar.
+ * @param buffer Buffer de salida donde se copiara el mensaje.
+ */
 void message_serialize(const Message* msg, char* buffer);
+
+/**
+ * @brief Deserializa un buffer binario en una estructura Message.
+ *
+ * @param buffer Buffer de entrada con datos serializados.
+ * @param msg Puntero al mensaje donde se almacenara el resultado.
+ */
 void message_deserialize(const char* buffer, Message* msg);
+
+/**
+ * @brief Obtiene el tamano fijo del mensaje serializado.
+ *
+ * @return Tamano en bytes de la estructura Message.
+ */
 size_t message_size(void);
 
 #endif  // PROTOCOL_H
