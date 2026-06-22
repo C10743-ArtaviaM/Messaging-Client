@@ -15,16 +15,26 @@ SRCS = $(SRC_DIR)/main.c \
        $(SRC_DIR)/mpi_wrapper.c
 
 TARGET   = mensajeria
+TEST_BIN = test_protocol
 
-.PHONY: all clean sanitize
+.PHONY: all clean sanitize test
 
 all: $(TARGET)
 
 $(TARGET): $(SRCS)
 	$(CC) $(CFLAGS) -I$(INC_DIR) $^ -o $@ $(LIBS)
 
+test:
+	$(CC) -std=c11 -Wall -Wextra -g \
+	$(TEST_DIR)/test_protocol.c \
+	$(SRC_DIR)/protocol.c \
+	-I$(INC_DIR) \
+	-o $(TEST_BIN)
+
+	./$(TEST_BIN)
+
 sanitize: CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
 sanitize: $(TARGET)
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(TEST_BIN)
