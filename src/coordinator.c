@@ -24,7 +24,7 @@ static void route_direct(Message* msg) {
   int dest = msg->dest_ranks[0];
   char buffer[sizeof(Message)];
   message_serialize(msg, buffer);
-  mpiw_send_message(msg, dest, TAG_DIRECT);
+  send_message(msg, dest, TAG_DIRECT);
   printf("[Coordinador] Mensaje de rank %d -> rank %d\n", msg->sender_rank,
          dest);
 }
@@ -35,7 +35,7 @@ static void route_broadcast(Message* msg) {
 
   for (int i = 0; i < msg->dest_count; i++) {
     int dest = msg->dest_ranks[i];
-    mpiw_send_message(msg, dest, TAG_BROADCAST);
+    send_message(msg, dest, TAG_BROADCAST);
   }
   printf("[Coordinador] Broadcast de rank %d -> %d destinatarios\n",
          msg->sender_rank, msg->dest_count);
@@ -62,7 +62,7 @@ static void broadcast_user_list(int clients_expected) {
   message_serialize(&msg, buffer);
 
   for (int i = 0; i < clients_expected; i++) {
-    mpiw_send_message(&msg, clients[i].rank, TAG_USER_LIST);
+    send_message(&msg, clients[i].rank, TAG_USER_LIST);
   }
 
   printf("[Coordinador] Lista de usuarios enviada: %s\n", list_str);
@@ -76,7 +76,7 @@ void coordinator_run(int total_processes) {
     Message msg;
     MPI_Status status;
 
-    mpiw_recv_message(&msg, MPI_ANY_SOURCE, TAG_REGISTER, &status);
+    receive_message(&msg, MPI_ANY_SOURCE, TAG_REGISTER, &status);
 
     register_client(msg.sender_rank, msg.body);
   }
@@ -91,7 +91,7 @@ void coordinator_run(int total_processes) {
     Message msg;
     MPI_Status status;
 
-    if (!mpiw_poll_message(&msg, &status)) {
+    if (!try_receive_message(&msg, &status)) {
       continue;
     }
 

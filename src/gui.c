@@ -48,7 +48,7 @@ static void* receiver_thread(void* arg) {
   MPI_Status status;
 
   while (keep_listening) {
-    if (mpiw_poll_message(&msg, &status)) {
+    if (try_receive_message(&msg, &status)) {
       char* display = malloc(MAX_BODY_LEN + 64);
 
       snprintf(display, MAX_BODY_LEN + 64, "Rank %d: %s", msg.sender_rank,
@@ -152,7 +152,7 @@ static void receive_user_list(int rank, char user_list[][40], int* user_count,
   Message msg;
   MPI_Status status;
 
-  mpiw_recv_message(&msg, 0, TAG_USER_LIST, &status);
+  receive_message(&msg, 0, TAG_USER_LIST, &status);
   *user_count = 0;
   char* token = strtok(msg.body, ",");
 

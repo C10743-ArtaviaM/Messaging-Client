@@ -9,28 +9,20 @@
 #include "../include/client.h"
 #include "../include/coordinator.h"
 #include "../include/gui.h"
+#include "../include/mpi_wrapper.h"
 
 int main(int argc, char* argv[]) {
-  int provided;
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+  mpi_init(&argc, &argv);
 
-  if (provided < MPI_THREAD_MULTIPLE) {
-    fprintf(stderr,
-            "Advertencia: se solicita MPI_THREAD_MULTIPLE pero el nivel "
-            "optenido fue %d\n",
-            provided);
-  }
-
-  int rank, size;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  int rank = mpi_rank();
+  int size = mpi_size();
 
   if (argc < size) {
     if (rank == 0) {
       fprintf(stderr,
               "Uso: mpirun -np N ./mensajeria user1 user2 ... userN-1\n");
     }
-    MPI_Finalize();
+    mpi_finalize();
     return EXIT_FAILURE;
   }
 
@@ -48,7 +40,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (rank == 0) {
+  if (rank = 0) {
     coordinator_run(size);
   } else if (use_gui) {
     gui_run(rank, argv[rank], size);
@@ -56,6 +48,6 @@ int main(int argc, char* argv[]) {
     client_run(rank, argv[rank], dest, mesg_count);
   }
 
-  MPI_Finalize();
+  mpi_finalize();
   return EXIT_SUCCESS;
 }

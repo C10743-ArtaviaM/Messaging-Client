@@ -9,23 +9,23 @@
 #include "../include/protocol.h"
 
 /* Init | Finalize */
-void mpiw_init(int* argc, char*** argv);
-void mpiw_finalize(void);
+void mpi_init(int* argc, char*** argv);
+void mpi_finalize(void);
 
 /* Info */
 int mpi_rank(void);
 int mpi_size(void);
 
 /* TIME */
-double mpiw_time(void);
+double get_time(void);
 
 /* SEND */
-void mpiw_send_message(const Message* msg, int dest, int tag);
+void send_message(const Message* msg, int dest, int tag);
 
 /* RECV (bloqueante) */
-void mpiw_recv_message(Message* msg, int source, int tag, MPI_Status* status);
+void receive_message(Message* msg, int source, int tag, MPI_Status* status);
 
 /* POLL (no bloquante como con Iprobe) */
-int mpiw_poll_message(Message* msg, MPI_Status* status);
+int try_receive_message(Message* msg, MPI_Status* status);
 
 #endif  // MPI_WRAPPER_H
