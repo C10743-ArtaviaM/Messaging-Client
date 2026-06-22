@@ -6,14 +6,12 @@
 #include "../include/gui.h"
 
 #include <gtk/gtk.h>
-#include <mpi.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "../include/client.h"
-#include "../include/coordinator.h"
 #include "../include/protocol.h"
 
 static GtkWidget* chat_view;
@@ -45,29 +43,23 @@ static gboolean update_chat_from_main_thread(gpointer data) {
 // Hilo receptor: sondea con un MPI_Iprobe, no toca GTK directamente
 static void* receiver_thread(void* arg) {
   (void)arg;
-  char buffer[sizeof(Message)];
+
   Message msg;
   MPI_Status status;
-  int has_message;
 
   while (keep_listening) {
-    MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &has_message,
-               &status);
-
-    if (has_message) {
-      MPI_Recv(buffer, sizeof(Message), MPI_CHAR, status.MPI_SOURCE,
-               status.MPI_TAG, MPI_COMM_WORLD, &status);
-      message_deserialize(buffer, &msg);
-
+    if (mpiw_poll_message(&msg, &status)) {
       char* display = malloc(MAX_BODY_LEN + 64);
+
       snprintf(display, MAX_BODY_LEN + 64, "Rank %d: %s", msg.sender_rank,
                msg.body);
-      // Encolo actualizacion que GTK ejecuta en su hilo.
+
       g_idle_add(update_chat_from_main_thread, display);
     } else {
       usleep(10000);
     }
   }
+
   return NULL;
 }
 
@@ -160,10 +152,7 @@ static void receive_user_list(int rank, char user_list[][40], int* user_count,
   Message msg;
   MPI_Status status;
 
-  MPI_Recv(buffer, sizeof(Message), MPI_CHAR, 0, TAG_USER_LIST, MPI_COMM_WORLD,
-           &status);
-  message_deserialize(buffer, &msg);
-
+  mpiw_recv_message(&msg, 0, TAG_USER_LIST, &status);
   *user_count = 0;
   char* token = strtok(msg.body, ",");
 

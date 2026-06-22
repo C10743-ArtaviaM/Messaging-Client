@@ -6,6 +6,8 @@
 
 #define MAX_CLIENTS 64
 
+#include "../include/mpi_wrapper.h"
+
 typedef struct {
   int rank;
   char username[32];

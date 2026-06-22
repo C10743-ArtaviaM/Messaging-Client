@@ -24,7 +24,7 @@ static void route_direct(Message* msg) {
   int dest = msg->dest_ranks[0];
   char buffer[sizeof(Message)];
   message_serialize(msg, buffer);
-  MPI_Send(buffer, sizeof(Message), MPI_CHAR, dest, TAG_DIRECT, MPI_COMM_WORLD);
+  mpiw_send_message(msg, dest, TAG_DIRECT);
   printf("[Coordinador] Mensaje de rank %d -> rank %d\n", msg->sender_rank,
          dest);
 }
@@ -35,8 +35,7 @@ static void route_broadcast(Message* msg) {
 
   for (int i = 0; i < msg->dest_count; i++) {
     int dest = msg->dest_ranks[i];
-    MPI_Send(buffer, sizeof(Message), MPI_CHAR, dest, TAG_BROADCAST,
-             MPI_COMM_WORLD);
+    mpiw_send_message(msg, dest, TAG_BROADCAST);
   }
   printf("[Coordinador] Broadcast de rank %d -> %d destinatarios\n",
          msg->sender_rank, msg->dest_count);
@@ -63,8 +62,7 @@ static void broadcast_user_list(int clients_expected) {
   message_serialize(&msg, buffer);
 
   for (int i = 0; i < clients_expected; i++) {
-    MPI_Send(buffer, sizeof(Message), MPI_CHAR, clients[i].rank, TAG_USER_LIST,
-             MPI_COMM_WORLD);
+    mpiw_send_message(&msg, clients[i].rank, TAG_USER_LIST);
   }
 
   printf("[Coordinador] Lista de usuarios enviada: %s\n", list_str);
@@ -72,27 +70,30 @@ static void broadcast_user_list(int clients_expected) {
 
 void coordinator_run(int total_processes) {
   int clients_expected = total_processes - 1;
-  char buffer[sizeof(Message)];
-  Message msg;
-  MPI_Status status;
 
-  // Fase 1 - Registro de Clientes
+  // REGISTRO
   for (int i = 0; i < clients_expected; i++) {
-    MPI_Recv(buffer, sizeof(Message), MPI_CHAR, MPI_ANY_SOURCE, TAG_REGISTER,
-             MPI_COMM_WORLD, &status);
-    message_deserialize(buffer, &msg);
+    Message msg;
+    MPI_Status status;
+
+    mpiw_recv_message(&msg, MPI_ANY_SOURCE, TAG_REGISTER, &status);
+
     register_client(msg.sender_rank, msg.body);
   }
 
   printf(
       "[Coordinador] Todos los clientes registrados. Enrutando mensajes ...\n");
+
   broadcast_user_list(clients_expected);
 
-  // Fase 2 - Loop de enrutamiento
+  // LOOP PRINCIPAL
   while (1) {
-    MPI_Recv(buffer, sizeof(Message), MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG,
-             MPI_COMM_WORLD, &status);
-    message_deserialize(buffer, &msg);
+    Message msg;
+    MPI_Status status;
+
+    if (!mpiw_poll_message(&msg, &status)) {
+      continue;
+    }
 
     if (status.MPI_TAG == TAG_DIRECT) {
       route_direct(&msg);

@@ -4,6 +4,8 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
+#include "../include/mpi_wrapper.h"
+
 void client_run(int rank, const char* username, int dest, int msg_count);
 void send_register(int rank, const char* username);
 void send_direct(int rank, const char* username, int dest, const char* text);

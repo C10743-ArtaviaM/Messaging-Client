@@ -27,7 +27,7 @@ void send_register(int rank, const char* username) {
 
   char buffer[sizeof(Message)];
   message_serialize(&msg, buffer);
-  MPI_Send(buffer, sizeof(Message), MPI_CHAR, 0, TAG_REGISTER, MPI_COMM_WORLD);
+  mpiw_send_message(&msg, 0, TAG_REGISTER);
   printf("[Cliente %d] Registrado como '%s'\n", rank, username);
 }
 
@@ -42,7 +42,7 @@ void send_direct(int rank, const char* username, int dest, const char* text) {
 
   char buffer[sizeof(Message)];
   message_serialize(&msg, buffer);
-  MPI_Send(buffer, sizeof(Message), MPI_CHAR, 0, TAG_DIRECT, MPI_COMM_WORLD);
+  mpiw_send_message(&msg, 0, TAG_DIRECT);
   printf("[Cliente %d '%s'] Mensaje directo a rank %d: '%s'\n", rank, username,
          dest, text);
 }
@@ -63,7 +63,7 @@ void send_broadcast(int rank, const char* username, int* dests, int dest_count,
 
   char buffer[sizeof(Message)];
   message_serialize(&msg, buffer);
-  MPI_Send(buffer, sizeof(Message), MPI_CHAR, 0, TAG_BROADCAST, MPI_COMM_WORLD);
+  mpiw_send_message(&msg, 0, TAG_BROADCAST);
   printf("[Cliente %d '%s'] Broadcast a %d destinatarios: '%s'\n", rank,
          username, dest_count, text);
 }
@@ -77,13 +77,10 @@ static void* receiver_thread(void* arg) {
   int has_message;
 
   while (keep_listening) {
-    MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &has_message,
-               &status);
+    Message msg;
+    MPI_Status status;
 
-    if (has_message) {
-      MPI_Recv(buffer, sizeof(Message), MPI_CHAR, status.MPI_SOURCE,
-               status.MPI_TAG, MPI_COMM_WORLD, &status);
-      message_deserialize(buffer, &msg);
+    if (mpiw_poll_message(&msg, &status)) {
       printf("[Cliente %d] Mensaje recibido de rank %d: '%s'\n", rank,
              msg.sender_rank, msg.body);
     } else {
@@ -115,9 +112,9 @@ void client_run(int rank, const char* username, int dest, int msg_count) {
     double total_time = 0;
 
     for (int i = 0; i < msg_count; i++) {
-      double start = MPI_Wtime();
+      double start = mpiw_time();
       send_direct(rank, username, dest, "Mensaje de prueba");
-      double end = MPI_Wtime();
+      double end = mpiw_time();
       total_time += (end - start);
     }
     printf("[Cliente %d] Latencia promedio (%d mensajes): %f segundos\n", rank,
